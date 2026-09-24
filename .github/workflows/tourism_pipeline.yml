@@ -106,12 +106,12 @@ jobs:
           name: prepared-data
           path: artifacts/
 
-      - name: Run Model Training
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          python pipeline/model_training.py
-
+         - name: Run Model Training
+      env:
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        MLFLOW_ALLOW_FILE_STORE: "true"
+      run: |
+        python pipeline/model_training.py
       - name: Upload MLflow results
         uses: actions/upload-artifact@v4
         with:
