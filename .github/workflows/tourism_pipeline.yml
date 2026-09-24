@@ -79,14 +79,11 @@ jobs:
   # 3. MODEL TRAINING
   # ==========================================
 
-  model-training:
-
+   model-training:
     needs: data-prep
-
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -98,26 +95,38 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install streamlit pandas numpy==2.1.3 scikit-learn==1.6.1 joblib==1.6.0 dill huggingface_hub mlflow
+          pip install -r requirements.txt
 
-      - name: Download prepared data
-        uses: actions/download-artifact@v4
-        with:
-          name: prepared-data
-          path: artifacts/
+            - name: Download prepared data
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python - <<'PY'
+          from huggingface_hub import hf_hub_download
 
-         - name: Run Model Training
-      env:
-        HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        MLFLOW_ALLOW_FILE_STORE: "true"
-      run: |
-        python pipeline/model_training.py
-      - name: Upload MLflow results
-        uses: actions/upload-artifact@v4
-        with:
-          name: mlflow-results
-          path: mlruns/
+          hf_hub_download(
+              repo_id="Khushibk/tourism-dataset",
+              filename="train.csv",
+              repo_type="dataset",
+              local_dir="data",
+              token="${HF_TOKEN}"
+          )
 
+          hf_hub_download(
+              repo_id="Khushibk/tourism-dataset",
+              filename="test.csv",
+              repo_type="dataset",
+              local_dir="data",
+              token="${HF_TOKEN}"
+          )
+          PY
+
+      - name: Run Model Training
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          MLFLOW_ALLOW_FILE_STORE: "true"
+        run: |
+          python pipeline/model_training.py
 
   # ==========================================
   # 4. DEPLOYMENT VERIFICATION
