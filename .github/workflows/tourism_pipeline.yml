@@ -7,7 +7,11 @@ on:
 
 jobs:
 
-  test-project:
+  # ==========================================
+  # 1. REGISTER DATASET
+  # ==========================================
+
+  register-dataset:
 
     runs-on: ubuntu-latest
 
@@ -24,20 +28,126 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install streamlit pandas numpy==2.1.3 scikit-learn==1.6.1 joblib==1.6.0 dill huggingface_hub
+          pip install pandas huggingface_hub
 
-      - name: Verify Hugging Face authentication
+      - name: Register Dataset on Hugging Face
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          python -c "from huggingface_hub import whoami; print(whoami(token='$HF_TOKEN'))"
+          python pipeline/register_dataset.py
 
-      - name: Verify application file
+
+  # ==========================================
+  # 2. DATA PREPARATION
+  # ==========================================
+
+  data-prep:
+
+    needs: register-dataset
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas scikit-learn huggingface_hub
+
+      - name: Run Data Preparation
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python pipeline/data_prep.py
+
+      - name: Upload prepared data
+        uses: actions/upload-artifact@v4
+        with:
+          name: prepared-data
+          path: artifacts/
+
+
+  # ==========================================
+  # 3. MODEL TRAINING
+  # ==========================================
+
+  model-training:
+
+    needs: data-prep
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install streamlit pandas numpy==2.1.3 scikit-learn==1.6.1 joblib==1.6.0 dill huggingface_hub mlflow
+
+      - name: Download prepared data
+        uses: actions/download-artifact@v4
+        with:
+          name: prepared-data
+          path: artifacts/
+
+      - name: Run Model Training
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python pipeline/model_training.py
+
+      - name: Upload MLflow results
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlflow-results
+          path: mlruns/
+
+
+  # ==========================================
+  # 4. DEPLOYMENT VERIFICATION
+  # ==========================================
+
+  deploy-hosting:
+
+    needs:
+      - register-dataset
+      - data-prep
+      - model-training
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify Streamlit application
         run: |
           test -f app.py
-          test -f requirements.txt
-          echo "Application files verified successfully."
+          echo "Streamlit application found."
 
-      - name: Pipeline completed
+      - name: Verify requirements
         run: |
-          echo "Tourism Project MLOps pipeline completed successfully!"
+          test -f requirements.txt
+          echo "Requirements file found."
+
+      - name: Deployment completed
+        run: |
+          echo "Tourism Product Prediction deployment pipeline completed."
+          echo "Streamlit application is deployed from the main branch."
