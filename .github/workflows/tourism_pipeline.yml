@@ -7,16 +7,10 @@ on:
 
 jobs:
 
-  # ==========================================
-  # 1. REGISTER DATASET
-  # ==========================================
-
   register-dataset:
-
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -28,27 +22,20 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pandas huggingface_hub
+          pip install -r requirements.txt
 
-      - name: Register Dataset on Hugging Face
+      - name: Register Dataset
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           python pipeline/register_dataset.py
 
 
-  # ==========================================
-  # 2. DATA PREPARATION
-  # ==========================================
-
   data-prep:
-
     needs: register-dataset
-
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -60,7 +47,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pandas scikit-learn huggingface_hub
+          pip install -r requirements.txt
 
       - name: Run Data Preparation
         env:
@@ -68,18 +55,8 @@ jobs:
         run: |
           python pipeline/data_prep.py
 
-      - name: Upload prepared data
-        uses: actions/upload-artifact@v4
-        with:
-          name: prepared-data
-          path: artifacts/
 
-
-  # ==========================================
-  # 3. MODEL TRAINING
-  # ==========================================
-
-   model-training:
+  model-training:
     needs: data-prep
     runs-on: ubuntu-latest
 
@@ -97,29 +74,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-            - name: Download prepared data
+      - name: Download prepared data
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          python - <<'PY'
-          from huggingface_hub import hf_hub_download
-
-          hf_hub_download(
-              repo_id="Khushibk/tourism-dataset",
-              filename="train.csv",
-              repo_type="dataset",
-              local_dir="data",
-              token="${HF_TOKEN}"
-          )
-
-          hf_hub_download(
-              repo_id="Khushibk/tourism-dataset",
-              filename="test.csv",
-              repo_type="dataset",
-              local_dir="data",
-              token="${HF_TOKEN}"
-          )
-          PY
+          python -c "from huggingface_hub import hf_hub_download; hf_hub_download(repo_id='Khushibk/tourism-dataset', filename='train.csv', repo_type='dataset', local_dir='data', token='$HF_TOKEN'); hf_hub_download(repo_id='Khushibk/tourism-dataset', filename='test.csv', repo_type='dataset', local_dir='data', token='$HF_TOKEN')"
 
       - name: Run Model Training
         env:
@@ -128,35 +87,31 @@ jobs:
         run: |
           python pipeline/model_training.py
 
-  # ==========================================
-  # 4. DEPLOYMENT VERIFICATION
-  # ==========================================
 
   deploy-hosting:
-
-    needs:
-      - register-dataset
-      - data-prep
-      - model-training
-
+    needs: model-training
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Verify Streamlit application
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify application files
         run: |
           test -f app.py
-          echo "Streamlit application found."
-
-      - name: Verify requirements
-        run: |
           test -f requirements.txt
-          echo "Requirements file found."
+          echo "Application files verified successfully."
 
-      - name: Deployment completed
+      - name: Pipeline completed
         run: |
-          echo "Tourism Product Prediction deployment pipeline completed."
-          echo "Streamlit application is deployed from the main branch."
+          echo "Tourism Project MLOps pipeline completed successfully!"
